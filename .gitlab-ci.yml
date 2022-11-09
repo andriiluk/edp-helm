@@ -29,7 +29,7 @@ test:
     - 'helm lint'
     - 'helm dep update'
     - 'helm upgrade ${APP_NAME} . --install -n tsdb --create-namespace --values=values.yaml'
-    - 'sleep 4m'
+    - 'sleep 8m'
     - 'helm test ${APP_NAME}'
 
 push:
