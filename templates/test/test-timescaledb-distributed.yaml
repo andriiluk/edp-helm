@@ -1,0 +1,33 @@
+{{- if $.Values.isCommunity -}}
+{{- if ne ( $.Values.numDataNodes | int) 0 -}}
+
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "pg-zalando.fullname" . }}-test-distributed"
+  labels:
+    {{- include "pg-zalando.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-delete-policy": hook-succeeded
+spec:
+  containers:
+    - name: test-zpg
+      image: robrockdataio/iot-legacy-dwh:1.0.3
+      command:
+      - /bin/sh
+      - -c
+      - echo 'pg master'{{ .Values.pgClusterName }};
+        PGSSLMODE=require PGPASSWORD=postgres psql -U postgres -h {{ .Values.pgClusterName }}.{{ .Release.Namespace }}.svc.cluster.local -p 5432 -d tsdb -c 'drop table conditions_d;';
+        echo 'starting timescaleDB specific tests' &&
+        PGSSLMODE=require PGPASSWORD=postgres psql -U postgres -h {{ .Values.pgClusterName }}.{{ .Release.Namespace }}.svc.cluster.local -p 5432 -d tsdb -c 'CREATE TABLE conditions_d (time TIMESTAMPTZ NOT NULL,location TEXT NOT NULL,temperature DOUBLE PRECISION NULL,humidity DOUBLE PRECISION NULL);' &&
+        PGSSLMODE=require PGPASSWORD=postgres psql -U postgres -h {{ .Values.pgClusterName }}.{{ .Release.Namespace }}.svc.cluster.local -p 5432 -d tsdb -c "SELECT create_distributed_hypertable('conditions_d', 'time');" &&
+        PGSSLMODE=require PGPASSWORD=postgres psql -U postgres -h {{ .Values.pgClusterName }}.{{ .Release.Namespace }}.svc.cluster.local -p 5432 -d tsdb -c "INSERT INTO conditions_d(time, location, temperature, humidity) VALUES (NOW(), 'office', 70.0, 50.0);" &&
+        PGSSLMODE=require PGPASSWORD=postgres psql -U postgres -h {{ .Values.pgClusterName }}.{{ .Release.Namespace }}.svc.cluster.local -p 5432 -d tsdb -c "SELECT * FROM conditions_d ORDER BY time DESC LIMIT 100;" &&
+        PGSSLMODE=require PGPASSWORD=postgres psql -U postgres -h {{ .Values.pgClusterName }}.{{ .Release.Namespace }}.svc.cluster.local -p 5432 -d tsdb -c "SELECT time_bucket('15 minutes', time) AS fifteen_min,location, COUNT(*),MAX(temperature) AS max_temp,MAX(humidity) AS max_hum FROM conditions_d WHERE time > NOW() - interval '3 hours' GROUP BY fifteen_min, location ORDER BY fifteen_min DESC, max_temp DESC;" &&
+        PGSSLMODE=require PGPASSWORD=postgres psql -U postgres -h {{ .Values.pgClusterName }}.{{ .Release.Namespace }}.svc.cluster.local -p 5432 -d tsdb -c 'drop table conditions_d;';
+  restartPolicy: Never
+...
+{{ end }}
+{{ end }}

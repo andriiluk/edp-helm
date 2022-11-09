@@ -1,0 +1,15 @@
+1. Once the application and pods are ready you can manually test from these commands.
+
+
+PGPASSWORD=$(kubectl get secret postgres.{{ .Values.pgClusterName }}.credentials.postgresql.acid.zalan.do -n {{ .Release.Namespace }} -o 'jsonpath={.data.password}' | base64 -d)
+
+kubectl run zpgtest --image robrockdataio/iot-legacy-dwh:1.0.3 -it -n {{ .Release.Namespace }} --rm --restart=Never --command -- /bin/bash -c "PGSSLMODE=require PGPASSWORD=$PGPASSWORD psql -U postgres -h {{ .Values.pgClusterName }}.{{ .Release.Namespace }}.svc.cluster.local -p 5432 -d tsdb -c 'CREATE TABLE conditions (
+   time        TIMESTAMPTZ       NOT NULL,
+   location    TEXT              NOT NULL,
+   temperature DOUBLE PRECISION  NULL,
+   humidity    DOUBLE PRECISION  NULL
+);'"
+
+kubectl run zpgtest --image robrockdataio/iot-legacy-dwh:1.0.3 -it -n {{ .Release.Namespace }} --rm --restart=Never --command -- /bin/bash -c "PGSSLMODE=require PGPASSWORD=$PGPASSWORD psql -U postgres -h {{ .Values.pgClusterName }}.{{ .Release.Namespace }}.svc.cluster.local -p 5432 -d tsdb -c \"SELECT create_hypertable('conditions', 'time');\""
+
+kubectl run zpgtest --image robrockdataio/iot-legacy-dwh:1.0.3 -it -n {{ .Release.Namespace }} --rm --restart=Never --command -- /bin/bash -c "PGSSLMODE=require PGPASSWORD=$PGPASSWORD psql -U postgres -h {{ .Values.pgClusterName }}.{{ .Release.Namespace }}.svc.cluster.local -p 5432 -d tsdb -c 'drop table conditions;'"
