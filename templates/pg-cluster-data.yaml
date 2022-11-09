@@ -1,0 +1,80 @@
+{{- if $.Values.isCommunity -}}
+{{- range $pod := until ( .Values.numDataNodes | int) }}
+---
+kind: "postgresql"
+apiVersion: "acid.zalan.do/v1"
+metadata:
+  name: {{ $.Values.pgClusterName }}-data-{{ ($pod | toString) }}
+  labels:
+    team: {{ (split "-" $.Values.pgClusterName)._0 }} # if the teams API https://postgres-operator.readthedocs.io/en/latest/user/#teams-api-roles is required to generate users
+                                                    #  -> this line must be changed and a new value called team-name should be added to the config.json in the postgresql-tas repository
+                                                    #  -> which should be used as a prefix instead of the data-service name (i.e., postgresql) -> https://postgres-operator.readthedocs.io/en/latest/user/
+spec:
+  #TODO: host the image on gitlab
+  {{- if $.Values.isCommunity }}
+  dockerImage: loco144/spilo-14-community:2.1-p6
+  {{- end }}
+  teamId: "{{ (split "-" $.Values.pgClusterName)._0 }}"
+  postgresql:
+    version: "14"
+    parameters:
+      max_prepared_transactions: "5"
+  # patroni: #TODO: left this section here in case we want to change some patroni settings
+  #  pg_hba:
+  #    - local   all             all                                   trust
+  #    - hostssl all             +zalandos    127.0.0.1/32       pam
+  #    - host    all             all                127.0.0.1/32       md5
+  #    - hostssl all             +zalandos    ::1/128            pam
+  #    - host    all             all                ::1/128            md5
+  #    - local   replication     standby                    trust
+  #    - hostssl replication     standby all                md5
+  #    - hostnossl all           all                all                reject
+  #    - hostssl all             +zalandos    all                pam
+  #    - hostssl all             all                all                md5
+  #    - host    all       all   all   trust
+  numberOfInstances: {{ $.Values.dataNodesNumberOfreplicas }}
+  enableConnectionPooler: false
+  volume:
+    size: {{ $.Values.volume.size }}
+  allowedSourceRanges:
+    # IP ranges to access your cluster go here
+  preparedDatabases: # prepares a database at startup and gives it the necessary extensions
+    {{- range $index, $dbname := $.Values.preparedDatabases }}
+    {{ $dbname }}:
+      extensions:
+    {{- range $index, $extname := $.Values.preparedExtensions }}
+        {{ $extname }}: public
+    {{- end }}
+      schemas:
+        public:
+          defaultRoles: false
+    {{- end }}
+  tls:
+    secretName: "{{ $.Values.pgClusterName }}-cert"
+    certificateFile: "tls.crt"
+    privateKeyFile: "tls.key"
+    caFile: "ca.crt"
+  resources:
+    requests:
+      cpu: {{ $.Values.resources.requests.cpu }}
+      memory: {{ $.Values.resources.requests.memory }}
+    limits:
+      cpu: {{ $.Values.resources.limits.cpu }}
+      memory: {{ $.Values.resources.limits.memory }}
+  spiloFSGroup: 103
+
+{{- if $.Values.Clone.isClone }}
+{{- with (index $.Values.Clone.cloneofUid_data $pod) }}
+  env:
+    # the location in ADLS to clone from has to be dynamically changed for each data node
+    - name: CLONE_WALG_AZ_PREFIX
+      value: "azure://{{ $.Values.Backups.AzureContainerName }}/{{ $.Values.Clone.cloneOfName }}-data-{{ ($pod | toString) }}/$(PGVERSION)"
+  clone:
+    cluster: {{ $.Values.Clone.cloneOfName }}-data-{{ ($pod | toString) }}
+    uid: {{ .UID }}
+    timestamp: {{ $.Values.Clone.cloneTimestamp }}
+{{- end }}
+{{- end }}
+...
+{{ end }}
+{{ end }}

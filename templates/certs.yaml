@@ -1,0 +1,38 @@
+apiVersion: v1
+data:
+  password: changeme
+kind: Secret
+metadata:
+  name: {{ .Values.pgClusterName }}-cert-keystore
+type: Opaque
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ .Values.pgClusterName }}-cert
+spec:
+  dnsNames:
+  - {{ .Values.pgClusterName | trimSuffix "." }}
+  - '*.{{ .Values.pgClusterName | trimSuffix "." }}'
+  duration: {{ "43800h0m0s" }}
+  commonName: {{ .Values.pgClusterName }}-cert
+  secretName: {{ .Values.pgClusterName }}-cert
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    name: {{ .Values.pgClusterName }}-root-issuer
+    kind: Issuer
+    group: cert-manager.io
+  keystores:
+    jks:
+      create: true
+      passwordSecretRef:
+        key: password
+        name:  {{ .Values.pgClusterName }}-cert-keystore
+    jks:
+      create: true
+      passwordSecretRef:
+        key: password
+        name: {{ .Values.pgClusterName }}-cert-keystore
+---
