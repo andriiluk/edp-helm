@@ -1,0 +1,179 @@
+# Default values for pg-timescaledb.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# how many instances should be deployed -> access node. if the number is above 1, the other pg instances will be replicas of the master node
+numberOfInstances: 2
+
+# whether to use the community license or not
+isCommunity: true
+
+# the number of timescaledb data nodes to be deployed
+numDataNodes: 3
+
+# the number of data nodes replicas per data node. this can be configured to either rely on the native data replication capabilities between the data nodes
+# or if the number is configured to be more than 1, each data node will have a replica for maximum HA
+dataNodesNumberOfreplicas: 1
+
+# add databases so that they can be created and attached to the data nodes
+preparedDatabases:
+  - tsdb
+  - postgres
+
+# possible extensions
+# decoderbufs, hypopg, pg_cron, pg_partman, pg_stat_kcache, pgq, plpgsql_check, postgis, set_user and timescaledb
+preparedExtensions:
+  - timescaledb
+  - postgis
+
+
+
+image:
+  repository: nginx
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: ""
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+
+
+# the name of the timescaledb postgres cluster that serves as an access node
+pgClusterName: "rf-timescaledb-cluster"
+
+# these settings are only for the access node
+enableMasterLoadBalancer: true
+enableReplicationLoadBalancer: false
+enableConnectionPooler: true
+
+
+Backup:
+  # enable cloud backup to azure cloud (TODO: add S3, custom-S3 , and GCP)
+  enableCloudBackup_AZ: false
+  azureStorageAccessKey: "changeme"
+  # the name of the container inside of the storage account
+  # P.S.: has to be created beforehand.
+  AzureContainerName: "pg-test-bkps"
+
+
+Clone:
+  # whether to clone the cluster. cloning only works if the cluster is being restored in-place (i.e., in the same namespace)
+  # or on a different cluster but in the same namespace. -> changing the namespace name doesn't work. the connections between the access node and data nodes will fail.
+  isClone: false
+  # the UID of the original cluster that can be found in the statefulset
+  cloneOfUid: "848d6b3c-c7ab-4e0c-a6dd-7ce798c32939"
+  # the name of the access node of the original cluster
+  cloneOfName: "rf-timescaledb-cluster"
+  # the TZ in the timestamp is required to clone from object storage (offset relative to UTC, see RFC 3339 section 5.6) (fmt: +00:00)
+  # the timestamp to perform PITR (point in time restore)
+  cloneTimestamp: "2022-11-11T19:50:00+01:00"
+
+  # the UID and names of the datanodes
+  # the nodes has to be written incrementally (for now! -> TODO)
+  cloneofUid_data:
+    - UID: "d4330db2-45c7-4b58-b048-f0468e404f1a"
+      dataNode: "rf-timescaledb-cluster-data-0"
+    - UID: "a975a5b8-703f-4064-98af-1905776f7fa2"
+      dataNode: "rf-timescaledb-cluster-data-1"
+    - UID: "b347f53d-65c6-44e9-803c-06bb1f5eee23"
+      dataNode: "rf-timescaledb-cluster-data-2"
+
+
+
+
+postgresoperator:
+  podServiceAccount:
+    # the name of the service account for the operator
+    name: "rf-podserviceaccount"
+  enableMasterLoadBalancer: "true"
+  enableReplicaLoadBalancer: "true"
+  configKubernetes:
+
+    # these two settings had to be commented out in order for this helm chart to work without
+    # backups. However, they will be filled from the config file in the tas repo.
+#    pod_environment_secret: psql-backup-creds-rf-timescaledb-cluster
+#    pod_environment_configmap: pod-env-override-rf-timescaledb-cluster
+
+    # setting the watched_namespace is required so that different operators don't overwrite each other's settings
+    watched_namespace: tsdb
+  configAwsOrGcp:
+    # the name of the storage account in Azure
+    wal_az_storage_account: "evoilalakehouse"
+
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: false
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+
+podAnnotations: {}
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+service:
+  type: ClusterIP
+  port: 80
+
+ingress:
+  enabled: false
+  annotations: {}
+    # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/tls-acme: "true"
+  hosts:
+    - host: chart-example.local
+      paths: []
+  tls: []
+  #  - secretName: chart-example-tls
+  #    hosts:
+  #      - chart-example.local
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 100Mi
+  limits:
+    cpu: 500m
+    memory: 500Mi
+
+volume:
+  size: "3Gi"
+
+# We usually recommend not to specify default resources and to leave this as a conscious
+# choice for the user. This also increases chances charts run on environments with little
+# resources, such as Minikube. If you do want to specify resources, uncomment the following
+# lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+# limits:
+#   cpu: 100m
+#   memory: 128Mi
+# requests:
+#   cpu: 100m
+#   memory: 128Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+  # targetMemoryUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}

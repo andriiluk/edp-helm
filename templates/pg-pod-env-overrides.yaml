@@ -1,0 +1,40 @@
+{{- if .Values.Backup.enableCloudBackup_AZ -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pod-env-override-{{ .Values.pgClusterName }}
+data:
+  # Any env variable used by spilo can be added  -> pod_environment_configmap should be configured for the operator https://postgres-operator.readthedocs.io/en/latest/administrator/#custom-pod-environment-variables
+  BACKUP_NUM_TO_RETAIN: "5"
+  BACKUP_SCHEDULE: '00 01 * * *'
+  USE_WALG_BACKUP: "true"
+  USE_WALG_RESTORE: "true"
+  CLONE_USE_WALG_RESTORE: "true"
+  WALG_AZ_PREFIX: "azure://{{ .Values.Backups.AzureContainerName }}/$(SCOPE)/$(PGVERSION)" # Enables Azure Backups (SCOPE = Cluster name) (PGVERSION = Postgres version)
+{{- if .Values.Clone.isClone }}
+  CLONE_WALG_AZ_PREFIX: "azure://{{ .Values.Backups.AzureContainerName }}/{{ .Values.Clone.cloneOfName }}/$(PGVERSION)" # Enables Azure Backups (SCOPE = Cluster name) (PGVERSION = Postgres version)
+{{- end -}}
+{{- end -}}
+
+
+
+# TODO: left it here for the future to extend the backup options and include custom-S3 object storage as an option
+# apiVersion: v1
+# kind: ConfigMap
+# metadata:
+#   name: pod-config
+# data:
+#   WAL_S3_BUCKET: postgresql
+#   WAL_BUCKET_SCOPE_PREFIX: ""
+#   WAL_BUCKET_SCOPE_SUFFIX: ""
+#   USE_WALG_BACKUP: "true"
+#   USE_WALG_RESTORE: "true"
+#   BACKUP_SCHEDULE: '00 10 * * *'
+#   AWS_ACCESS_KEY_ID: postgresql
+#   AWS_SECRET_ACCESS_KEY: supersecret
+#   AWS_S3_FORCE_PATH_STYLE: "true" # needed for MinIO
+#   AWS_ENDPOINT: http://minio.home.lab:9000 # Endpoint URL to your S3 Endpoint; MinIO in this example
+#   AWS_REGION: de01
+#   WALG_DISABLE_S3_SSE: "true"
+#   BACKUP_NUM_TO_RETAIN: "5"
+#   CLONE_USE_WALG_RESTORE: "true"

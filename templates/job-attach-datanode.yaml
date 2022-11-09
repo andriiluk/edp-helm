@@ -1,0 +1,116 @@
+{{- if $.Values.isCommunity -}}
+{{- if eq ( $.Values.Clone.isClone | toString) "false" -}}
+{{- range $pod, $e := until ( $.Values.numDataNodes | int) }}
+{{- range $index, $dbname := $.Values.preparedDatabases }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ printf "attachdn-%s-db%s-data%s" $.Release.Name ($index | toString) ($pod | toString) | trunc 63 }}
+  labels:
+    team: {{ (split "-" $.Values.pgClusterName)._0 }}
+    release: {{ $.Release.Name }}
+    heritage: {{ $.Release.Service }}
+  annotations:
+    "helm.sh/hook-delete-policy": hook-succeeded
+spec:
+  ttlSecondsAfterFinished: 120
+  template:
+    metadata:
+      labels:
+        team: {{ (split "-" $.Values.pgClusterName)._0 }}
+        release: {{ $.Release.Name }}
+        heritage: {{ $.Release.Service }}
+        dataNode: {{ $.Values.pgClusterName }}-data-{{ ($pod | toString) }}
+    spec:
+      containers:
+      - name: attachdn-{{ $index }}
+        image: postgres:11-alpine # A relatively small official image that can run psql
+        command:
+          - sh
+          - -c
+          # We wait for the data node to allow connections
+          # We wait for the access node to allow connections to DBNAME
+          # we attach the data nodes
+          # we allow user postgres the permission to use the data node
+          # we create a user mapping for user postgres to use the UN and PW of the datanode's credentials
+          - >
+              while ! pg_isready -U postgres -h "${DATA_NODE_DNS}"; do sleep 1; done;
+              while ! psql -d "${ACCESS_SVC_CONNSTR}" --set dbname="${DBNAME}" --set ON_ERROR_STOP=1 --command '\c :"dbname"'; do sleep 1 ; done;
+              sleep 1m;
+              echo "${SQLCOMMAND}" | psql -d "${ACCESS_SVC_CONNSTR}" --file=- --echo-queries --set ON_ERROR_STOP=1 \
+                --set dbname="${DBNAME}" \
+                --set data_node_name="${DATA_NODE_NAME}" \
+                --set data_node_dns="${DATA_NODE_DNS}" \
+                --set data_node_password="${DATA_NODE_PGPASSWORD}" &&
+              echo "${SQLCOMMAND_USER_USAGE}" | psql -d "${ACCESS_SVC_CONNSTR}" --file=- --echo-queries --set ON_ERROR_STOP=1 \
+                --set dbname="${DBNAME}" \
+                --set data_node_name="${DATA_NODE_NAME}" \
+                --set data_node_dns="${DATA_NODE_DNS}" \
+                --set username="${PGUSERNAME}" \
+                --set data_node_password="${DATA_NODE_PGPASSWORD}" &&
+              echo "${SQLCOMMAND_USER_MAPPING}" | psql -d "${ACCESS_SVC_CONNSTR}" --file=- --echo-queries --set ON_ERROR_STOP=0 \
+                --set dbname="${DBNAME}" \
+                --set data_node_name="${DATA_NODE_NAME}" \
+                --set data_node_username="${DATA_NODE_PGUSERNAME}" \
+                --set username="${PGUSERNAME}" \
+                --set data_node_password="${DATA_NODE_PGPASSWORD}"
+        env:
+{{- /*
+Some parameter juggling is required to ensure we don't have SQL injection;
+which is not necessarily a major security leak at this stage, but we want
+to be able to support database names like 'test db' or, 'CamelCase'.
+
+The template quote function ensures bash will be able to interpret the variable.
+The --set dbname= and subsequent :'dbname' psql_variable ensures no SQL injection can occur.
+
+https://www.postgresql.org/docs/current/app-psql.html#APP-PSQL-INTERPOLATION
+*/}}
+        - name: DBNAME
+          value: {{ $dbname | quote }}
+        - name: ACCESS_SVC_CONNSTR
+          value: host={{ $.Values.pgClusterName }}.{{ $.Release.Namespace }}.svc.cluster.local user=postgres connect_timeout=3 sslmode=require
+        - name: DATA_NODE_DNS
+          value: {{ $.Values.pgClusterName }}-data-{{ ($pod | toString) }}.{{ $.Release.Namespace }}.svc.cluster.local
+        - name: DATA_NODE_NAME
+          value: {{ $.Values.pgClusterName }}-data-{{ ($pod | toString) }}
+        - name: SQLCOMMAND
+          value: |
+            \c :"dbname"
+            SELECT *
+              FROM add_data_node(:'data_node_name'::name, host => :'data_node_dns', if_not_exists => true, password=> :'data_node_password')
+        - name: SQLCOMMAND_USER_USAGE
+          value: |
+            \c :"dbname"
+            GRANT USAGE ON FOREIGN SERVER :"data_node_name" TO :username
+        - name: SQLCOMMAND_USER_MAPPING
+          value: |
+            \c :"dbname"
+            CREATE USER MAPPING FOR :username SERVER :"data_node_name" OPTIONS (user :'data_node_username', password :'data_node_password')
+        - name: PGUSERNAME
+          valueFrom:
+            secretKeyRef:
+              name: postgres.{{ $.Values.pgClusterName }}.credentials.postgresql.acid.zalan.do
+              key: username
+        - name: PGPASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgres.{{ $.Values.pgClusterName }}.credentials.postgresql.acid.zalan.do
+              key: password
+        - name: DATA_NODE_PGUSERNAME
+          valueFrom:
+            secretKeyRef:
+              name: postgres.{{ $.Values.pgClusterName }}-data-{{ ($pod | toString) }}.credentials.postgresql.acid.zalan.do
+              key: username
+        - name: DATA_NODE_PGPASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgres.{{ $.Values.pgClusterName }}-data-{{ ($pod | toString) }}.credentials.postgresql.acid.zalan.do
+              key: password
+      restartPolicy: OnFailure
+  backoffLimit: 5
+...
+{{ end }}
+{{ end }}
+{{ end }}
+{{ end }}

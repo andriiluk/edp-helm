@@ -1,0 +1,37 @@
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: {{ .Values.pgClusterName }}-selfsigned-issuer
+  labels:
+    {{- include "pg-zalando.labels" . | nindent 4 }}
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ .Values.pgClusterName }}-root-certificate 
+  labels:
+    {{- include "pg-zalando.labels" . | nindent 4 }}
+spec:
+  isCA: true
+  commonName: {{ .Values.pgClusterName }}-root-certificate 
+  secretName: {{ .Values.pgClusterName }}-root-certificate 
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    name: {{ .Values.pgClusterName }}-selfsigned-issuer
+    kind: Issuer
+    group: cert-manager.io
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: {{ .Values.pgClusterName }}-root-issuer
+  labels:
+    {{- include "pg-zalando.labels" . | nindent 4 }}
+spec:
+  ca:
+    secretName: {{ .Values.pgClusterName }}-root-certificate 
+---

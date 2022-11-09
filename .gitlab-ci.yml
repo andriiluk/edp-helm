@@ -1,0 +1,107 @@
+variables:
+  # Helm repo for all EDP Data services will be the same. I.e. EDP Data Services Registry project
+  HELM_REPO: "${CI_API_V4_URL}/projects/23/packages/helm/stable"
+  CONTAINER_REPO: ""
+  APP_NAME: edp-data-timescaledb-poc
+  KUBERNETES_SERVICE_ACCOUNT_OVERWRITE: gitlab-runner
+  PG_ZALANDO_OPERATOR_REPO: "https://opensource.zalando.com/postgres-operator/charts/postgres-operator"
+
+default:
+  image:
+    name: alpine/helm:3.9.0
+    entrypoint: [""]
+
+
+stages:
+  - test
+  - release
+  #- qa
+
+test:
+  tags:
+    - random-forests
+  stage: test
+  before_script:
+    - 'helm repo add --insecure-skip-tls-verify --username gitlab-ci-token --password ${CI_JOB_TOKEN} ${CI_PROJECT_NAME} ${HELM_REPO}'
+    - 'helm repo add --insecure-skip-tls-verify postgres-operator-charts ${PG_ZALANDO_OPERATOR_REPO}'
+    - 'helm plugin install https://github.com/chartmuseum/helm-push'
+  script:
+    - 'helm lint'
+    - 'helm dep update'
+    - 'helm upgrade ${APP_NAME} . --install -n tsdb --create-namespace --values=values.yaml'
+    - 'sleep 6m'
+    - 'helm test -n tsdb ${APP_NAME}'
+
+push:
+  stage: release
+  before_script:
+    - 'helm repo add --insecure-skip-tls-verify --username gitlab-ci-token --password ${CI_JOB_TOKEN} ${CI_PROJECT_NAME} ${HELM_REPO}'
+    - 'helm repo add --insecure-skip-tls-verify postgres-operator-charts ${PG_ZALANDO_OPERATOR_REPO}'
+    - 'helm plugin install https://github.com/chartmuseum/helm-push'
+  rules:
+    - if: $CI_COMMIT_TAG      # Run this job when a tag is created manually
+  script:
+    - 'helm cm-push --insecure . ${HELM_REPO} --username gitlab-ci-token --password ${CI_JOB_TOKEN} --version="$CI_COMMIT_TAG"' # this step will package the helm chart with it's dependencies into a single release (i.e., the operator and the helm chart around the operator)
+
+release_job:
+  stage: release
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  needs:
+    - push
+  rules:
+    - if: $CI_COMMIT_TAG      # Run this job when a tag is created manually
+  script:
+    - echo 'running release_job'
+  release:
+    name: 'Release $CI_COMMIT_TAG'
+    description: 'Created using the release-cli'
+    tag_name: '$CI_COMMIT_TAG'
+    ref: '$CI_COMMIT_TAG'
+
+
+# an automatic release notes generator based on the merged pull requests
+# it detects the PR's and Issues which have the following keywords and writes them as release notes under the following titles
+#    name in PR: "breaking change", title: "Notable changes"
+#    name in PR: "enhancement", title: "Enhancements"
+#    name in PR: "feature", title: "New features"
+#    name in PR: "bug", title: "Fixed bugs"
+
+# the behavior is as follows:
+
+# 1- Find the latest tag.
+# 2- Find the previous tag that is on the same branch as the latest tag.
+# 3- Locate the date range between the latest and the previous tag. If there is only a tag in the project, then the from date will be the project creation date and the to date will be that tag's creation date.
+# 4- Find all Merged pull requests and Closed issues within that time range
+# 5- Generate a release note/changelog based on the findings above.
+
+# what is being used is a modified version based on -> https://github.com/jk1z/gitlab-release-note-generator.git
+
+generate-release-note:
+ needs:
+   - release_job
+ variables:
+   GITLAB_PERSONAL_TOKEN: ${PERSONAL_TOKEN} # the CI_JOB_TOKEN doesn't work. although, the API documentation says otherwise. -> https://docs.gitlab.com/ee/api/releases/
+   GITLAB_PROJECT_ID: ${CI_PROJECT_ID}
+   TARGET_BRANCH: ${CI_DEFAULT_BRANCH}
+   GITLAB_API_ENDPOINT: ${CI_API_V4_URL}
+ rules:
+   - if: $CI_COMMIT_TAG      # Run this job when a tag is created manually
+ stage: release
+ image:
+   name: loco144/gitlab-release-note-generator:latest
+   #pull_policy: always  # available -> always, if-not-present, never -> not allowed on runner level
+ script:
+   - node /src/app/index.js
+
+
+
+#trigger-qa-downstream:
+#  inherit:
+#    variables: false
+#  stage: qa
+#  rules:
+#    - if: $CI_COMMIT_TAG      # Run this job when a tag is created manually
+#  variables:
+#    DATA_APP: 'druid'   # kafka-lite, postgresql, nifi
+#    APP_VERSION: '$CI_COMMIT_TAG'
+#  trigger: edp/oe/qa/edp-qa-automation
