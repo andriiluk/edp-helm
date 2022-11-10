@@ -1,4 +1,4 @@
-# Helm Chart for Postgresql Operator Installation
+# Helm Chart for TimescaleDB Operator Installation
 
 This helm chart installs the operator for Postgresql and creates a timescaleDB cluster.
 
