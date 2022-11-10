@@ -10,9 +10,9 @@ data:
   USE_WALG_BACKUP: "true"
   USE_WALG_RESTORE: "true"
   CLONE_USE_WALG_RESTORE: "true"
-  WALG_AZ_PREFIX: "azure://{{ .Values.Backups.AzureContainerName }}/$(SCOPE)/$(PGVERSION)" # Enables Azure Backups (SCOPE = Cluster name) (PGVERSION = Postgres version)
+  WALG_AZ_PREFIX: "azure://{{ .Values.Backup.AzureContainerName }}/$(SCOPE)/$(PGVERSION)" # Enables Azure Backups (SCOPE = Cluster name) (PGVERSION = Postgres version)
 {{- if .Values.Clone.isClone }}
-  CLONE_WALG_AZ_PREFIX: "azure://{{ .Values.Backups.AzureContainerName }}/{{ .Values.Clone.cloneOfName }}/$(PGVERSION)" # Enables Azure Backups (SCOPE = Cluster name) (PGVERSION = Postgres version)
+  CLONE_WALG_AZ_PREFIX: "azure://{{ .Values.Backup.AzureContainerName }}/{{ .Values.Clone.cloneOfName }}/$(PGVERSION)" # Enables Azure Backups (SCOPE = Cluster name) (PGVERSION = Postgres version)
 {{- end -}}
 {{- end -}}
 

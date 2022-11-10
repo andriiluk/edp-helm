@@ -1,10 +1,10 @@
-{{- if .Values.enableCloudBackup_AZ -}}
+{{- if .Values.Backup.enableCloudBackup_AZ -}}
 apiVersion: v1
 kind: Secret
 metadata:
   name: psql-backup-creds-{{ $.Values.pgClusterName }}
 type: Opaque
 stringData:
-  AZURE_STORAGE_ACCESS_KEY: {{ $.Values.Clone.azureStorageAccessKey }}
-  CLONE_AZURE_STORAGE_ACCESS_KEY: {{ $.Values.Clone.azureStorageAccessKey }}
+  AZURE_STORAGE_ACCESS_KEY: {{ $.Values.Backup.azureStorageAccessKey }}
+  CLONE_AZURE_STORAGE_ACCESS_KEY: {{ $.Values.Backup.azureStorageAccessKey }}
 {{- end -}}

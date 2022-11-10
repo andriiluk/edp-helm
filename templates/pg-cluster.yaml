@@ -1,3 +1,6 @@
+{{- $preparedDatabasesList := splitList "," $.Values.preparedDatabases }}
+{{- $preparedExtensionsList := splitList "," $.Values.preparedExtensions }}
+
 kind: "postgresql"
 apiVersion: "acid.zalan.do/v1"
 metadata:
@@ -32,16 +35,18 @@ spec:
   #  public: zalando
 
   preparedDatabases: # prepares a database at startup and gives it the necessary extensions
-    {{- range $index, $dbname := $.Values.preparedDatabases }}
+    {{- range $index, $dbname := $preparedDatabasesList }}
     {{ $dbname }}:
       extensions:
-    {{- range $index, $extname := $.Values.preparedExtensions }}
+    {{- range $index, $extname := $preparedExtensionsList }}
         {{ $extname }}: public
     {{- end }}
       schemas:
         public:
           defaultRoles: false
     {{- end }}
+
+
   tls:
     secretName: "{{ .Values.pgClusterName }}-cert"
     certificateFile: "tls.crt"

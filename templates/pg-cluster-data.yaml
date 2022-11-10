@@ -1,4 +1,6 @@
 {{- if $.Values.isCommunity -}}
+{{- $preparedDatabasesList := splitList "," $.Values.preparedDatabases }}
+{{- $preparedExtensionsList := splitList "," $.Values.preparedExtensions }}
 {{- range $pod := until ( .Values.numDataNodes | int) }}
 ---
 kind: "postgresql"
@@ -38,17 +40,20 @@ spec:
     size: {{ $.Values.volume.size }}
   allowedSourceRanges:
     # IP ranges to access your cluster go here
+
   preparedDatabases: # prepares a database at startup and gives it the necessary extensions
-    {{- range $index, $dbname := $.Values.preparedDatabases }}
+    {{- range $index, $dbname := $preparedDatabasesList }}
     {{ $dbname }}:
       extensions:
-    {{- range $index, $extname := $.Values.preparedExtensions }}
+    {{- range $index, $extname := $preparedExtensionsList }}
         {{ $extname }}: public
     {{- end }}
       schemas:
         public:
           defaultRoles: false
     {{- end }}
+
+
   tls:
     secretName: "{{ $.Values.pgClusterName }}-cert"
     certificateFile: "tls.crt"
@@ -63,16 +68,20 @@ spec:
       memory: {{ $.Values.resources.limits.memory }}
   spiloFSGroup: 103
 
+
+
 {{- if $.Values.Clone.isClone }}
-{{- with (index $.Values.Clone.cloneofUid_data $pod) }}
+{{- $UIDs := splitList "," $.Values.Clone.cloneofUid_data }}
+{{- with (index $UIDs $pod) }}
   env:
     # the location in ADLS to clone from has to be dynamically changed for each data node
     - name: CLONE_WALG_AZ_PREFIX
-      value: "azure://{{ $.Values.Backups.AzureContainerName }}/{{ $.Values.Clone.cloneOfName }}-data-{{ ($pod | toString) }}/$(PGVERSION)"
+      value: "azure://{{ $.Values.Backup.AzureContainerName }}/{{ $.Values.Clone.cloneOfName }}-data-{{ ($pod | toString) }}/$(PGVERSION)"
   clone:
     cluster: {{ $.Values.Clone.cloneOfName }}-data-{{ ($pod | toString) }}
-    uid: {{ .UID }}
+    uid: {{ . }}
     timestamp: {{ $.Values.Clone.cloneTimestamp }}
+
 {{- end }}
 {{- end }}
 ...
