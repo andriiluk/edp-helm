@@ -1,7 +1,8 @@
 {{- if $.Values.isCommunity -}}
 {{- if eq ( $.Values.Clone.isClone | toString) "false" -}}
 {{- range $pod, $e := until ( $.Values.numDataNodes | int) }}
-{{- range $index, $dbname := $.Values.preparedDatabases }}
+{{- $preparedDatabasesList := splitList "," $.Values.preparedDatabases }}
+{{- range $index, $dbname := $preparedDatabasesList }}
 ---
 apiVersion: batch/v1
 kind: Job
