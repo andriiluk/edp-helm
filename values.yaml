@@ -39,7 +39,7 @@ fullnameOverride: ""
 pgClusterName: "rf-timescaledb-cluster"
 
 # these settings are only for the access node
-enableMasterLoadBalancer: true
+enableMasterLoadBalancer: false
 enableReplicationLoadBalancer: false
 enableConnectionPooler: true
 
