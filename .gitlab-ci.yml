@@ -15,7 +15,7 @@ default:
 stages:
   - test
   - release
-  #- qa
+  - qa
 
 test:
   tags:
