@@ -1,0 +1,64 @@
+{{- if .Values.Monitor.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $.Values.pgClusterName }}-{{ .Values.Monitor.exporterServiceName }}
+  labels:
+    app: {{ .Values.Monitor.exporterServiceName }}
+    application: spilo
+    team: {{ (split "-" .Values.pgClusterName)._0 }}
+    cluster-name: {{ .Values.pgClusterName }}
+    release: {{ .Release.Name }}
+    Namespace: {{ .Release.Namespace }}
+spec:
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+    - name: {{ .Values.Monitor.exporterServiceName }}
+      port: 9187
+      targetPort: exporter
+  selector:
+    application: spilo
+    team: {{ (split "-" .Values.pgClusterName)._0 }}
+    cluster-name: {{ $.Values.pgClusterName }}
+{{- end }}
+---
+{{- if and ( .Capabilities.APIVersions.Has "monitoring.coreos.com/v1" ) ( .Values.Monitor.enabled ) }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+{{- if .Values.Monitor.labels }}
+  labels:
+{{ toYaml .Values.Monitor.labels | indent 4}}
+{{- end }}
+  name: {{ .Values.pgClusterName }}-service-monitor
+{{- if .Values.Monitor.namespace }}
+  namespace: {{ .Values.Monitor.namespace }}
+{{- end }}
+spec:
+  endpoints:
+  - port: {{ .Values.Monitor.exporterServiceName }}
+{{- if .Values.Monitor.interval }}
+    interval: {{ .Values.Monitor.interval }}
+{{- end }}
+{{- if .Values.Monitor.telemetryPath }}
+    path: {{ .Values.Monitor.telemetryPath }}
+{{- end }}
+{{- if .Values.Monitor.timeout }}
+    scrapeTimeout: {{ .Values.Monitor.timeout }}
+{{- end }}
+  namespaceSelector:
+    matchNames:
+    - {{ .Release.Namespace }}
+  selector:
+    matchLabels:
+      application: spilo
+      team: {{ (split "-" .Values.pgClusterName)._0 }}
+      cluster-name: {{ .Values.pgClusterName }}
+      release: {{ .Release.Name }}
+      app: {{ .Values.Monitor.exporterServiceName }}
+  targetLabels:
+    - Namespace
+    - release
+{{- end }}

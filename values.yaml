@@ -5,10 +5,10 @@
 # how many instances should be deployed -> access node. if the number is above 1, the other pg instances will be replicas of the master node
 numberOfInstances: 2
 
-# whether to use the community license or not
-isCommunity: true
+# whether to use the community license or not - P.S.: Community images can only be pulled from a private registry
+isCommunity: false
 
-# the number of timescaledb data nodes to be deployed
+# the number of timescaledb data nodes to be deployed - P.S.: only taken into account if isCommunity is true and image.private_repository is true
 numDataNodes: 3
 
 # the number of data nodes replicas per data node. this can be configured to either rely on the native data replication capabilities between the data nodes
@@ -24,10 +24,12 @@ preparedExtensions: "timescaledb,postgis"
 
 
 image:
-  repository: nginx
+  private_repository: false
+  repository_community: registry.bare.pandrosion.org/edp/data/data-devops/utility-images/spilo-14-community
+  repository_apache: registry.bare.pandrosion.org/edp/data/data-devops/utility-images/spilo-14-apache
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: ""
+  tag: 1.0.0
 
 imagePullSecrets: []
 nameOverride: ""
@@ -39,10 +41,26 @@ fullnameOverride: ""
 pgClusterName: "rf-timescaledb-cluster"
 
 # these settings are only for the access node
-enableMasterLoadBalancer: false
+enableMasterLoadBalancer: true
 enableReplicationLoadBalancer: false
 enableConnectionPooler: true
+allowedSourceRanges: "0.0.0.0/0,127.0.0.1/32" # load balancers' source ranges for both master and replica services
+cleanUpJob: true
 
+# enable or disable vault, in case vault is disabled the username and password for the admin user will be generated automatically
+# moreover, if vault is enabled and backups in azure are enabled the azureStorageAccessKey will be taken from vault
+Vault:
+  enabled: false
+  clusterSecretStoreName: "vault-backend" # the name of the secretstore backend
+  vaultSecretPath: "avp/test" # the path in vault for the secret
+  adminUserNameKey: "username" # the key of the un secret -> this must be postgres or the operator will just overwrite it
+  adminPasswordKey: "password" # the key of the password secret
+  azureStorageAccessKeyVaultKey: "backupkey" # the key of the azurestorageaccesskey in vault
+
+
+TLS: # whether to use an existing clusterissuer. if false, a new issuer will be created automatically
+  ClusterIssuer: false
+  ClusterIssuerName: "ca-issuer"
 
 Backup:
   # enable cloud backup to azure cloud (TODO: add S3, custom-S3 , and GCP)
@@ -51,6 +69,7 @@ Backup:
   # the name of the container inside of the storage account
   # P.S.: has to be created beforehand.
   AzureContainerName: "pg-test-bkps"
+
 
 
 Clone:
@@ -69,28 +88,62 @@ Clone:
   # the nodes has to be written incrementally (for now! -> TODO)
   cloneofUid_data: "d4330db2-45c7-4b58-b048-f0468e404f1a,a975a5b8-703f-4064-98af-1905776f7fa2,b347f53d-65c6-44e9-803c-06bb1f5eee23"
 
+Monitor:
+  enabled: false
+  telemetryPath: /metrics
+  exporterServiceName: "pg-exporter"
+  # Set the namespace the ServiceMonitor should be deployed
+  namespace: prometheus
+  # Set how frequently Prometheus should scrape
+  interval: 30s
+  # Set labels for the ServiceMonitor, use this to define your scrape label for Prometheus Operator
+  labels:
+    release: prometheus
+  # Set timeout for scrape
+  # timeout: 10s
 
 
-
+# operator configuration
 postgresoperator:
   podServiceAccount:
     # the name of the service account for the operator
-    name: "rf-podserviceaccount"
+    name: "rfpodserviceaccount"
   enableMasterLoadBalancer: "true"
   enableReplicaLoadBalancer: "true"
   configKubernetes:
-
-    # these two settings had to be commented out in order for this helm chart to work without
-    # backups. However, they will be filled from the config file in the tas repo.
-
-    # pod_environment_secret:  psql-backup-creds-rf-timescaledb-cluster
-    # pod_environment_configmap:  pod-env-override-rf-timescaledb-cluster
-
     # setting the watched_namespace is required so that different operators don't overwrite each other's settings
-    watched_namespace: tsdb
+    watched_namespace: "tsdb"
+    # these two settings are required so that the operator will run. However, if backups & cloning are not configured they will be filled with dummy and empty data
+    pod_environment_secret: psql-backup-creds-rf-timescaledb-cluster
+    pod_environment_configmap: pod-env-override-rf-timescaledb-cluster
+    pod_service_account_definition: '{ "apiVersion": "v1", "kind": "ServiceAccount", "metadata": { "name": "zalando-postgres-operator" }, "imagePullSecrets": [ { "name": "regcred" } ] }'
   configAwsOrGcp:
     # the name of the storage account in Azure
     wal_az_storage_account: "evoilalakehouse"
+
+  # configure behavior of load balancers
+  configLoadBalancer:
+    # DNS zone for cluster DNS name when load balancer is configured for cluster
+    # db_hosted_zone: db.example.com
+    # annotations to apply to service when load balancing is enabled
+    custom_service_annotations:
+      cloud.google.com/load-balancer-type: "Internal"
+
+  controllerID:
+    # Specifies whether a controller ID should be defined for the operator
+    # Note, all postgres manifest must then contain the following annotation to be found by this operator
+    # "acid.zalan.do/controller": <controller-ID-of-the-operator>
+    create: true
+    # The name of the controller ID to use.
+    # If not set and create is true, a name is generated using the fullname template
+    name: rf-timescaledb-cluster
+
+
+
+
+
+
+
 
 
 serviceAccount:
@@ -133,16 +186,30 @@ ingress:
   #    hosts:
   #      - chart-example.local
 
-resources:
-  requests:
-    cpu: 100m
-    memory: 100Mi
-  limits:
-    cpu: 500m
-    memory: 500Mi
+# access node resources
+AN:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+    limits:
+      cpu: 500m
+      memory: 500Mi
 
-volume:
-  size: "3Gi"
+  volume:
+    size: "3Gi"
+# data node resources
+DN:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+    limits:
+      cpu: 500m
+      memory: 500Mi
+
+  volume:
+    size: "3Gi"
 
 # We usually recommend not to specify default resources and to leave this as a conscious
 # choice for the user. This also increases chances charts run on environments with little
