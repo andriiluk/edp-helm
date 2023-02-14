@@ -1,3 +1,6 @@
+
+{{- if ne .Values.TLS.ClusterIssuer true }}
+
 apiVersion: cert-manager.io/v1
 kind: Issuer
 metadata:
@@ -10,13 +13,13 @@ spec:
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: {{ .Values.pgClusterName }}-root-certificate 
+  name: {{ .Values.pgClusterName }}-root-certificate
   labels:
     {{- include "pg-zalando.labels" . | nindent 4 }}
 spec:
   isCA: true
-  commonName: {{ .Values.pgClusterName }}-root-certificate 
-  secretName: {{ .Values.pgClusterName }}-root-certificate 
+  commonName: {{ .Values.pgClusterName }}-root-certificate
+  secretName: {{ .Values.pgClusterName }}-root-certificate
   privateKey:
     algorithm: ECDSA
     size: 256
@@ -33,5 +36,6 @@ metadata:
     {{- include "pg-zalando.labels" . | nindent 4 }}
 spec:
   ca:
-    secretName: {{ .Values.pgClusterName }}-root-certificate 
+    secretName: {{ .Values.pgClusterName }}-root-certificate
 ---
+{{- end }}

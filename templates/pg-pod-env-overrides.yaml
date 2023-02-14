@@ -14,7 +14,18 @@ data:
 {{- if .Values.Clone.isClone }}
   CLONE_WALG_AZ_PREFIX: "azure://{{ .Values.Backup.AzureContainerName }}/{{ .Values.Clone.cloneOfName }}/$(PGVERSION)" # Enables Azure Backups (SCOPE = Cluster name) (PGVERSION = Postgres version)
 {{- end -}}
+
+{{ else }}
+# if backups are not configured
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.postgresoperator.configKubernetes.pod_environment_configmap }}
+data:
+  # Any env variable used by spilo can be added  -> pod_environment_configmap should be configured for the operator https://postgres-operator.readthedocs.io/en/latest/administrator/#custom-pod-environment-variables
+  BACKUP_NUM_TO_RETAIN: "5"
 {{- end -}}
+
 
 
 

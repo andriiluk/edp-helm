@@ -1,4 +1,28 @@
 {{- if .Values.Backup.enableCloudBackup_AZ -}}
+
+{{- if .Values.Vault.enabled }}
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: {{ .Values.pgClusterName }}-azure-backup-cred
+spec:
+  refreshInterval: "15s"
+  secretStoreRef:
+    name: {{ .Values.Vault.clusterSecretStoreName }}
+    kind: ClusterSecretStore
+  target:
+    name: psql-backup-creds-{{ $.Values.pgClusterName }}
+
+  data:
+  - secretKey: AZURE_STORAGE_ACCESS_KEY
+    remoteRef:
+      key: {{ .Values.Vault.vaultSecretPath }}
+      property: {{ .Values.Vault.azureStorageAccessKeyVaultKey }}
+  - secretKey: CLONE_AZURE_STORAGE_ACCESS_KEY
+    remoteRef:
+      key: {{ .Values.Vault.vaultSecretPath }}
+      property: {{ .Values.Vault.azureStorageAccessKeyVaultKey }}
+{{ else }}
 apiVersion: v1
 kind: Secret
 metadata:
@@ -7,4 +31,16 @@ type: Opaque
 stringData:
   AZURE_STORAGE_ACCESS_KEY: {{ $.Values.Backup.azureStorageAccessKey }}
   CLONE_AZURE_STORAGE_ACCESS_KEY: {{ $.Values.Backup.azureStorageAccessKey }}
+{{- end }}
+
+{{ else }}
+# if we do not enable backup, create a secret as a placeholder so that the operator container can run
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $.Values.postgresoperator.configKubernetes.pod_environment_secret }}
+type: Opaque
+stringData:
+  AZURE_STORAGE_ACCESS_KEY: "dummy placeholder"
+  CLONE_AZURE_STORAGE_ACCESS_KEY: "dummy placeholder"
 {{- end -}}

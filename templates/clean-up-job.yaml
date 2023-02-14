@@ -1,0 +1,95 @@
+# Delete the zombie statefulsets
+{{- if .Values.cleanUpJob }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Values.pgClusterName }}-clean-up-job
+  annotations:
+    "helm.sh/hook": pre-delete
+    "helm.sh/hook-delete-policy": hook-succeeded
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
+  labels:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+spec:
+ template:
+   spec:
+     serviceAccountName: {{ .Release.Name }}-postgresoperator
+     restartPolicy: OnFailure
+     containers:
+     - name: main
+       image: "lightbend/curl:7.47.0"
+       imagePullPolicy: IfNotPresent
+       command:
+         - "/bin/sh"
+         - "-c"
+         - 'curl --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt --header "Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" -X DELETE https://kubernetes.default.svc/apis/apps/v1/namespaces/{{ .Release.Namespace }}/statefulsets/{{ .Values.pgClusterName }} &&
+            curl --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt --header "Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" -X DELETE https://kubernetes.default.svc/api/v1/namespaces/{{ .Release.Namespace }}/services/{{ .Values.pgClusterName }} &&
+            curl --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt --header "Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" -X DELETE https://kubernetes.default.svc/api/v1/namespaces/{{ .Release.Namespace }}/services/{{ .Values.pgClusterName }}-pooler &&
+            curl --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt --header "Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" -X DELETE https://kubernetes.default.svc/api/v1/namespaces/{{ .Release.Namespace }}/services/{{ .Values.pgClusterName }}-repl &&
+            curl --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt --header "Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" -X DELETE https://kubernetes.default.svc/api/v1/namespaces/{{ .Release.Namespace }}/services/{{ .Values.pgClusterName }}-config &&
+            curl --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt --header "Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" -X DELETE https://kubernetes.default.svc/api/v1/namespaces/{{ .Release.Namespace }}/secrets/postgres.{{ .Values.pgClusterName }}.credentials.postgresql.acid.zalan.do &&
+            curl --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt --header "Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" -X DELETE https://kubernetes.default.svc/api/v1/namespaces/{{ .Release.Namespace }}/secrets/pooler.{{ .Values.pgClusterName }}.credentials.postgresql.acid.zalan.do &&
+            curl --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt --header "Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" -X DELETE https://kubernetes.default.svc/api/v1/namespaces/{{ .Release.Namespace }}/secrets/standby.{{ .Values.pgClusterName }}.credentials.postgresql.acid.zalan.do &&
+            curl --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt --header "Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" -X DELETE https://kubernetes.default.svc/api/v1/namespaces/{{ .Release.Namespace }}/secrets/psql-backup-creds-{{ .Values.pgClusterName }} &&
+            curl --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt --header "Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" -X DELETE https://kubernetes.default.svc/api/v1/namespaces/{{ .Release.Namespace }}/serviceaccounts/{{ .Values.postgresoperator.podServiceAccount.name }} &&
+            curl --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt --header "Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" -X DELETE https://kubernetes.default.svc/api/v1/namespaces/{{ .Release.Namespace }}/persistentvolumeclaims/pgdata-{{ .Values.pgClusterName }}-0 &&
+            curl --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt --header "Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" -X DELETE https://kubernetes.default.svc/api/v1/namespaces/{{ .Release.Namespace }}/persistentvolumeclaims/pgdata-{{ .Values.pgClusterName }}-1 &&
+            curl --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt --header "Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" -X DELETE https://kubernetes.default.svc/api/v1/namespaces/{{ .Release.Namespace }}/persistentvolumeclaims/pgdata-{{ .Values.pgClusterName }}-2 &&
+            curl --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt --header "Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" -X DELETE https://kubernetes.default.svc/api/v1/namespaces/{{ .Release.Namespace }}/persistentvolumeclaims/pgdata-{{ .Values.pgClusterName }}-3 &&
+            curl --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt --header "Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" -X DELETE https://kubernetes.default.svc/api/v1/namespaces/{{ .Release.Namespace }}/persistentvolumeclaims/pgdata-{{ .Values.pgClusterName }}-4 &&
+            curl --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt --header "Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" -X DELETE https://kubernetes.default.svc/api/v1/namespaces/{{ .Release.Namespace }}/persistentvolumeclaims/pgdata-{{ .Values.pgClusterName }}-5 &&
+            curl --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt --header "Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" -X DELETE https://kubernetes.default.svc/api/v1/namespaces/{{ .Release.Namespace }}/persistentvolumeclaims/pgdata-{{ .Values.pgClusterName }}-6'
+{{- end }}
+---
+# Delete the zombie statefulsets
+{{- if .Values.cleanUpJob }}
+{{- if $.Values.isCommunity -}}
+{{- range $pod := until ( .Values.numDataNodes | int) }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $.Values.pgClusterName }}-data-{{ ($pod | toString) }}-clean-up-job
+  annotations:
+    "helm.sh/hook": pre-delete
+    "helm.sh/hook-delete-policy": hook-succeeded
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
+  labels:
+    app.kubernetes.io/instance: {{ $.Release.Name }}
+    app.kubernetes.io/managed-by: {{ $.Release.Service }}
+spec:
+ template:
+   spec:
+     serviceAccountName: {{ $.Release.Name }}-postgresoperator
+     restartPolicy: OnFailure
+     containers:
+     - name: main
+       image: "lightbend/curl:7.47.0"
+       imagePullPolicy: IfNotPresent
+       command:
+         - "/bin/sh"
+         - "-c"
+         - 'curl --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt --header "Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" -X DELETE https://kubernetes.default.svc/apis/apps/v1/namespaces/{{ $.Release.Namespace }}/statefulsets/{{ $.Values.pgClusterName }}-data-{{ ($pod | toString) }} &&
+            curl --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt --header "Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" -X DELETE https://kubernetes.default.svc/api/v1/namespaces/{{ $.Release.Namespace }}/services/{{ $.Values.pgClusterName }}-data-{{ ($pod | toString) }} &&
+            curl --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt --header "Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" -X DELETE https://kubernetes.default.svc/api/v1/namespaces/{{ $.Release.Namespace }}/services/{{ $.Values.pgClusterName }}-data-{{ ($pod | toString) }}-pooler &&
+            curl --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt --header "Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" -X DELETE https://kubernetes.default.svc/api/v1/namespaces/{{ $.Release.Namespace }}/services/{{ $.Values.pgClusterName }}-data-{{ ($pod | toString) }}-repl &&
+            curl --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt --header "Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" -X DELETE https://kubernetes.default.svc/api/v1/namespaces/{{ $.Release.Namespace }}/services/{{ $.Values.pgClusterName }}-data-{{ ($pod | toString) }}-config &&
+            curl --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt --header "Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" -X DELETE https://kubernetes.default.svc/api/v1/namespaces/{{ $.Release.Namespace }}/secrets/postgres.{{ $.Values.pgClusterName }}-data-{{ ($pod | toString) }}.credentials.postgresql.acid.zalan.do &&
+            curl --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt --header "Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" -X DELETE https://kubernetes.default.svc/api/v1/namespaces/{{ $.Release.Namespace }}/secrets/pooler.{{ $.Values.pgClusterName }}-data-{{ ($pod | toString) }}.credentials.postgresql.acid.zalan.do &&
+            curl --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt --header "Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" -X DELETE https://kubernetes.default.svc/api/v1/namespaces/{{ $.Release.Namespace }}/secrets/standby.{{ $.Values.pgClusterName }}-data-{{ ($pod | toString) }}.credentials.postgresql.acid.zalan.do &&
+            curl --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt --header "Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" -X DELETE https://kubernetes.default.svc/api/v1/namespaces/{{ $.Release.Namespace }}/persistentvolumeclaims/pgdata-{{ $.Values.pgClusterName }}-data-{{ ($pod | toString) }}-0 &&
+            curl --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt --header "Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" -X DELETE https://kubernetes.default.svc/api/v1/namespaces/{{ $.Release.Namespace }}/persistentvolumeclaims/pgdata-{{ $.Values.pgClusterName }}-data-{{ ($pod | toString) }}-1 &&
+            curl --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt --header "Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" -X DELETE https://kubernetes.default.svc/api/v1/namespaces/{{ $.Release.Namespace }}/persistentvolumeclaims/pgdata-{{ $.Values.pgClusterName }}-data-{{ ($pod | toString) }}-2 &&
+            curl --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt --header "Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" -X DELETE https://kubernetes.default.svc/api/v1/namespaces/{{ $.Release.Namespace }}/persistentvolumeclaims/pgdata-{{ $.Values.pgClusterName }}-data-{{ ($pod | toString) }}-3 &&
+            curl --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt --header "Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" -X DELETE https://kubernetes.default.svc/api/v1/namespaces/{{ $.Release.Namespace }}/persistentvolumeclaims/pgdata-{{ $.Values.pgClusterName }}-data-{{ ($pod | toString) }}-4 &&
+            curl --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt --header "Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" -X DELETE https://kubernetes.default.svc/api/v1/namespaces/{{ $.Release.Namespace }}/persistentvolumeclaims/pgdata-{{ $.Values.pgClusterName }}-data-{{ ($pod | toString) }}-5 &&
+            curl --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt --header "Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" -X DELETE https://kubernetes.default.svc/api/v1/namespaces/{{ $.Release.Namespace }}/persistentvolumeclaims/pgdata-{{ $.Values.pgClusterName }}-data-{{ ($pod | toString) }}-6'
+---
+{{- end }}
+{{- end }}
+{{- end }}
+# the operator is in charge of cleaning up the sts's generated by the CR. Therefore, a helm uninstall by argocd would delete the postgresql CR and the operator before it gets a change to clean-up the sts
+# in order to preserve our 1 operator per pg cluster tactic, which is paramount to configure and control pg clusters independently. it was decided that the clean up should happen through a job.
+# a pod shutdown grace period would require changes to the official operator helm chart, which would lead to an endless loop of dependencies and would make maintaining the project harder. Therefore, we voted against it.
+
+# P.S.: this cleanupjob will delete all the data (i.e., the pvcs) and the automatically generated passwords.

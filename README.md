@@ -43,3 +43,6 @@ helm edp-data-timescaledb-poc test -n tsdb
 ```
 
 Pre-configured connectivity options and tests will be displayed with the success determination of the tests.
+
+
+P.S.: this helm chart can be deployed either with an apache license image or a community license image. The apache license image does not allow clustering, only the community license does. Therefore, in case the user wants to enable clustering a docker registry secret has to be provided to the helm chart with the name "regcred" containing a token to the data team's docker registry on gitlab.

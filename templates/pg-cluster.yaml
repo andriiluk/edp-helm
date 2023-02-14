@@ -1,10 +1,13 @@
 {{- $preparedDatabasesList := splitList "," $.Values.preparedDatabases }}
 {{- $preparedExtensionsList := splitList "," $.Values.preparedExtensions }}
+{{- $allowedSourceRangesList := splitList "," $.Values.allowedSourceRanges }}
 
 kind: "postgresql"
 apiVersion: "acid.zalan.do/v1"
 metadata:
   name: {{ .Values.pgClusterName }}
+  annotations:
+    acid.zalan.do/controller: {{ .Values.pgClusterName }}
   labels:
     team: {{ (split "-" .Values.pgClusterName)._0 }} # if the teams API https://postgres-operator.readthedocs.io/en/latest/user/#teams-api-roles is required to generate users
                                                     #  -> this line must be changed and a new value called team-name should be added to the config.json in the postgresql-tas repository
@@ -12,9 +15,14 @@ metadata:
 spec:
   enableMasterLoadBalancer: {{ .Values.enableMasterLoadBalancer }}
   enableReplicaLoadBalancer: {{ .Values.enableReplicationLoadBalancer }}
-  {{- if .Values.isCommunity }} #TODO: host the image on gitlab
-  dockerImage: loco144/spilo-14-community:2.1-p6
+  {{- if .Values.image.private_repository }}
+  {{- if .Values.isCommunity }}
+  dockerImage: {{ .Values.image.repository_community }}:{{ .Values.image.tag }}
+  {{ else }}
+  dockerImage: {{ .Values.image.repository_apache }}:{{ .Values.image.tag }}
   {{- end }}
+  {{- end }}
+
   teamId: "{{ (split "-" .Values.pgClusterName)._0 }}"
   postgresql:
     version: "14"
@@ -23,10 +31,11 @@ spec:
   numberOfInstances: {{ .Values.numberOfInstances }}
   enableConnectionPooler: {{ .Values.enableConnectionPooler }}
   volume:
-    size: {{ .Values.volume.size }}
+    size: {{ .Values.AN.volume.size }}
   allowedSourceRanges:
-    # IP ranges to access your cluster go here
-
+{{- range $index, $iprange := $allowedSourceRangesList }}
+    - {{ $iprange }}
+{{- end }}
   #users: # TODO: left it here in case we want to create users via the operator
   #  zalando:  # db owner  -> offers another way to create a new user and give him permissions then the pg-secret
   #  - superuser
@@ -54,15 +63,46 @@ spec:
     caFile: "ca.crt"
   resources:
     requests:
-      cpu: {{ .Values.resources.requests.cpu }}
-      memory: {{ .Values.resources.requests.memory }}
+      cpu: {{ .Values.AN.resources.requests.cpu }}
+      memory: {{ .Values.AN.resources.requests.memory }}
     limits:
-      cpu: {{ .Values.resources.limits.cpu }}
-      memory: {{ .Values.resources.limits.memory }}
+      cpu: {{ .Values.AN.resources.limits.cpu }}
+      memory: {{ .Values.AN.resources.limits.memory }}
   spiloFSGroup: 103
 {{- if .Values.Clone.isClone }}
   clone:
     cluster: {{ .Values.Clone.cloneOfName }}
     uid: {{ .Values.Clone.cloneOfUid }}
     timestamp: {{ .Values.Clone.cloneTimestamp }}
+{{- end }}
+{{- if .Values.Monitor.enabled }}
+  sidecars:
+    - name: "exporter"
+      image: "wrouesnel/postgres_exporter"
+      ports:
+        - name: exporter
+          containerPort: 9187
+          protocol: TCP
+      resources:
+        limits:
+          cpu: 500m
+          memory: 256M
+        requests:
+          cpu: 100m
+          memory: 200M
+      env:
+        - name: "DATA_SOURCE_URI"
+          value: "localhost/?sslmode=require"
+        - name: "PG_EXPORTER_AUTO_DISCOVER_DATABASES"
+          value: "true"
+        - name: "DATA_SOURCE_USER"
+          valueFrom:
+            secretKeyRef:
+              name: postgres.{{ .Values.pgClusterName }}.credentials.postgresql.acid.zalan.do
+              key: username
+        - name: "DATA_SOURCE_PASS"
+          valueFrom:
+            secretKeyRef:
+              name: postgres.{{ .Values.pgClusterName }}.credentials.postgresql.acid.zalan.do
+              key: password
 {{- end }}

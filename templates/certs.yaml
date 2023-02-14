@@ -1,3 +1,4 @@
+
 apiVersion: v1
 data:
   password: changeme
@@ -20,10 +21,17 @@ spec:
   privateKey:
     algorithm: ECDSA
     size: 256
+{{- if .Values.TLS.ClusterIssuer }}
+  issuerRef:
+    name: {{ .Values.TLS.ClusterIssuerName }}
+    kind: ClusterIssuer
+    group: cert-manager.io
+{{ else }}
   issuerRef:
     name: {{ .Values.pgClusterName }}-root-issuer
     kind: Issuer
     group: cert-manager.io
+{{- end }}
   keystores:
     jks:
       create: true

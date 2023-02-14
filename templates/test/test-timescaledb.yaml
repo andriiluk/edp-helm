@@ -11,16 +11,23 @@ spec:
   containers:
     - name: test-zpg
       image: robrockdataio/iot-legacy-dwh:1.0.3
+      env:
+        - name: PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgres.{{ .Values.pgClusterName }}.credentials.postgresql.acid.zalan.do
+              key: password
+              optional: false
       command:
       - /bin/sh
       - -c
       - echo 'pg master'{{ .Values.pgClusterName }};
-        PGSSLMODE=require PGPASSWORD=postgres psql -U postgres -h {{ .Values.pgClusterName }}.{{ .Release.Namespace }}.svc.cluster.local -p 5432 -d tsdb -c 'drop table conditions;';
+        PGSSLMODE=require PGPASSWORD=$PASSWORD psql -U postgres -h {{ .Values.pgClusterName }}.{{ .Release.Namespace }}.svc.cluster.local -p 5432 -d tsdb -c 'drop table conditions;';
         echo 'starting timescaleDB specific tests' &&
-        PGSSLMODE=require PGPASSWORD=postgres psql -U postgres -h {{ .Values.pgClusterName }}.{{ .Release.Namespace }}.svc.cluster.local -p 5432 -d tsdb -c 'CREATE TABLE conditions (time TIMESTAMPTZ NOT NULL,location TEXT NOT NULL,temperature DOUBLE PRECISION NULL,humidity DOUBLE PRECISION NULL);' &&
-        PGSSLMODE=require PGPASSWORD=postgres psql -U postgres -h {{ .Values.pgClusterName }}.{{ .Release.Namespace }}.svc.cluster.local -p 5432 -d tsdb -c "SELECT create_hypertable('conditions', 'time');" &&
-        PGSSLMODE=require PGPASSWORD=postgres psql -U postgres -h {{ .Values.pgClusterName }}.{{ .Release.Namespace }}.svc.cluster.local -p 5432 -d tsdb -c "INSERT INTO conditions(time, location, temperature, humidity) VALUES (NOW(), 'office', 70.0, 50.0);" &&
-        PGSSLMODE=require PGPASSWORD=postgres psql -U postgres -h {{ .Values.pgClusterName }}.{{ .Release.Namespace }}.svc.cluster.local -p 5432 -d tsdb -c "SELECT * FROM conditions ORDER BY time DESC LIMIT 100;" &&
-        PGSSLMODE=require PGPASSWORD=postgres psql -U postgres -h {{ .Values.pgClusterName }}.{{ .Release.Namespace }}.svc.cluster.local -p 5432 -d tsdb -c "SELECT time_bucket('15 minutes', time) AS fifteen_min,location, COUNT(*),MAX(temperature) AS max_temp,MAX(humidity) AS max_hum FROM conditions WHERE time > NOW() - interval '3 hours' GROUP BY fifteen_min, location ORDER BY fifteen_min DESC, max_temp DESC;" &&
-        PGSSLMODE=require PGPASSWORD=postgres psql -U postgres -h {{ .Values.pgClusterName }}.{{ .Release.Namespace }}.svc.cluster.local -p 5432 -d tsdb -c 'drop table conditions;';
+        PGSSLMODE=require PGPASSWORD=$PASSWORD psql -U postgres -h {{ .Values.pgClusterName }}.{{ .Release.Namespace }}.svc.cluster.local -p 5432 -d tsdb -c 'CREATE TABLE conditions (time TIMESTAMPTZ NOT NULL,location TEXT NOT NULL,temperature DOUBLE PRECISION NULL,humidity DOUBLE PRECISION NULL);' &&
+        PGSSLMODE=require PGPASSWORD=$PASSWORD psql -U postgres -h {{ .Values.pgClusterName }}.{{ .Release.Namespace }}.svc.cluster.local -p 5432 -d tsdb -c "SELECT create_hypertable('conditions', 'time');" &&
+        PGSSLMODE=require PGPASSWORD=$PASSWORD psql -U postgres -h {{ .Values.pgClusterName }}.{{ .Release.Namespace }}.svc.cluster.local -p 5432 -d tsdb -c "INSERT INTO conditions(time, location, temperature, humidity) VALUES (NOW(), 'office', 70.0, 50.0);" &&
+        PGSSLMODE=require PGPASSWORD=$PASSWORD psql -U postgres -h {{ .Values.pgClusterName }}.{{ .Release.Namespace }}.svc.cluster.local -p 5432 -d tsdb -c "SELECT * FROM conditions ORDER BY time DESC LIMIT 100;" &&
+        PGSSLMODE=require PGPASSWORD=$PASSWORD psql -U postgres -h {{ .Values.pgClusterName }}.{{ .Release.Namespace }}.svc.cluster.local -p 5432 -d tsdb -c "SELECT time_bucket('15 minutes', time) AS fifteen_min,location, COUNT(*),MAX(temperature) AS max_temp,MAX(humidity) AS max_hum FROM conditions WHERE time > NOW() - interval '3 hours' GROUP BY fifteen_min, location ORDER BY fifteen_min DESC, max_temp DESC;" &&
+        PGSSLMODE=require PGPASSWORD=$PASSWORD psql -U postgres -h {{ .Values.pgClusterName }}.{{ .Release.Namespace }}.svc.cluster.local -p 5432 -d tsdb -c 'drop table conditions;';
   restartPolicy: Never

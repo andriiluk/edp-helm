@@ -15,6 +15,7 @@ metadata:
   annotations:
     argocd.argoproj.io/hook: PostSync
     argocd.argoproj.io/hook-delete-policy: HookSucceeded
+#    helm.sh/hook: post-upgrade,post-install
 spec:
   template:
     metadata:
