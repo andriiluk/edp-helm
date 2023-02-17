@@ -111,6 +111,9 @@ postgresoperator:
   enableMasterLoadBalancer: "true"
   enableReplicaLoadBalancer: "true"
   configKubernetes:
+    # list of label keys that can be inherited from the cluster manifest
+    inherited_labels:
+    - api-deletion-label
     # setting the watched_namespace is required so that different operators don't overwrite each other's settings
     watched_namespace: "tsdb"
     # these two settings are required so that the operator will run. However, if backups & cloning are not configured they will be filled with dummy and empty data
