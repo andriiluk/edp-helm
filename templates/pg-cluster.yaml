@@ -8,8 +8,8 @@ metadata:
   name: {{ .Values.pgClusterName }}
   annotations:
     acid.zalan.do/controller: {{ .Values.pgClusterName }}
-  labels:
     api-deletion-label: {{ .Values.pgClusterName }}
+  labels:
     team: {{ (split "-" .Values.pgClusterName)._0 }} # if the teams API https://postgres-operator.readthedocs.io/en/latest/user/#teams-api-roles is required to generate users
                                                     #  -> this line must be changed and a new value called team-name should be added to the config.json in the postgresql-tas repository
                                                     #  -> which should be used as a prefix instead of the data-service name (i.e., postgresql) -> https://postgres-operator.readthedocs.io/en/latest/user/
