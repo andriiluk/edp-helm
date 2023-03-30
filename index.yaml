@@ -3,7 +3,7 @@ entries:
   edp-data-timescaledb:
   - apiVersion: v2
     appVersion: 1.16.0
-    created: "2023-03-30T08:50:09.27842+03:00"
+    created: "2023-03-30T09:01:22.903595+03:00"
     dependencies:
     - alias: postgresoperator
       name: postgres-operator
@@ -14,12 +14,12 @@ entries:
     name: edp-data-timescaledb
     type: application
     urls:
-    - edp-data-timescaledb-0.2.0.tgz
+    - https://github.com/andriiluk/edp-helm/edp-data-timescaledb-0.2.0.tgz
     version: 0.2.0
   postgres-operator:
   - apiVersion: v1
     appVersion: 1.8.0
-    created: "2023-03-30T08:50:09.280306+03:00"
+    created: "2023-03-30T09:01:22.905392+03:00"
     description: Postgres Operator creates and manages PostgreSQL clusters running
       in Kubernetes
     digest: 3ae232cf009e09aa2ad11c171484cd2f1b72e63c59735e58fbe2b6eb842f4c86
@@ -37,6 +37,6 @@ entries:
     sources:
     - https://github.com/zalando/postgres-operator
     urls:
-    - charts/postgres-operator-1.8.0.tgz
+    - https://github.com/andriiluk/edp-helm/charts/postgres-operator-1.8.0.tgz
     version: 1.8.0
-generated: "2023-03-30T08:50:09.269903+03:00"
+generated: "2023-03-30T09:01:22.897059+03:00"
